@@ -23,8 +23,9 @@ class Sym repr where
     -- intS :: Int -> repr Int
     constS :: Lift a => a -> repr a
     addS :: repr (Int -> Int -> Int)
+    subS :: repr (Int -> Int -> Int)
     mulS :: repr (Int -> Int -> Int)
-    -- | Function application 
+    -- | Function application
     appS :: repr (a -> b) -> repr a -> repr b
     -- | Function abstraction
     lamS :: (repr a -> repr b) -> repr (a -> b)
@@ -40,6 +41,7 @@ instance Sym R where
     -- intS = R
     constS = R
     addS = R (+)
+    subS = R (-)
     mulS = R (*)
     R f `appS` R x = R $ f x
     lamS f = R $ runR . f . R
@@ -50,6 +52,7 @@ newtype Code a = Code { getCode :: Q (TExp a) }
 instance Sym Code where
   constS = Code . liftTyped
   addS = Code [|| (+) ||]
+  subS = Code [|| (-) ||]
   mulS = Code [|| (*) ||]
   appS (Code f) (Code x) = Code [|| $$(f) $$(x) ||]
   lamS f = Code [|| \x -> $$( (getCode . f . Code) [||  x ||] ) ||]
@@ -69,7 +72,56 @@ exS1 :: Sym repr => repr Int
 exS1 = (addS `appS` constS 1) `appS` constS 2
 
 
+-- * Optimization of tagless DSLs 
 
+-- | Reflection-reification pair
+--
+-- instances of this, at various specialized types 't', will let us perform specific optimizations on our DSL terms, i.e. without requiring "tagged" pattern matching.
+--
+-- see tutorial : https://okmij.org/ftp/tagless-final/course/optimizations.html#circuit-tut
+--
+-- some code bits taken from :
+-- 
+-- https://okmij.org/ftp/tagless-final/course/RR.hs
+-- https://okmij.org/ftp/tagless-final/course/B2Neg.hs
+class RR t repr where
+  -- | forward
+  fwd :: repr a -> t repr a
+  -- | backwards
+  bwd :: t repr a -> repr a
+  -- | map unary
+  map1 :: (repr a -> repr b) -> t repr a -> t repr b
+  map1 f = fwd . f . bwd
+  -- | map binary
+  map2 :: (repr a -> repr b -> repr c) -> t repr a -> t repr b -> t repr c
+  map2 f x y = fwd $ f (bwd x) (bwd y)
+
+-- A context for boolean values
+data Ctx = Pos | Neg
+
+-- An interpretation for a specific simplification : pushing negation to terms
+data PushNeg repr a = PN (Ctx -> repr a)
+
+-- * Tagless transformer
+-- We transform one interpreter into another :
+
+-- instance Symantics repr => Symantics (PushNeg repr) where
+--     lit x = PN $ \ctx -> case ctx of
+--                    Pos -> lit x
+--                    Neg -> lit (not x)
+--     neg (PN e) = PN $ \case
+--       Pos -> e Neg
+--       Neg -> e Pos
+    -- and (PN e1) (PN e2) = PN $ \case
+    --   Pos -> and (e1 Pos) (e2 Pos) -- homomorhism
+    --   Neg -> or  (e1 Neg) (e2 Neg) -- de Morgan law
+    -- or  (PN e1) (PN e2) = PN $ \case
+    --   Pos -> or  (e1 Pos) (e2 Pos) -- homomorhism
+    --   Neg -> and (e1 Neg) (e2 Neg) -- de Morgan law
+
+
+
+-- | ======================================
 
 -- -- combinators from the paper, using Compose instead of defining J
 

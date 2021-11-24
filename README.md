@@ -12,3 +12,9 @@ Here we use :
 paper : https://okmij.org/ftp/tagless-final/TaglessStaged/beyond.pdf
 
 code : https://okmij.org/ftp/tagless-final/TaglessStaged/TSCore.hs
+
+
+Also includes part the "reflection-reification" typeclass to enable simplification of terms by pattern matching, suitable for tagless DSLs : 
+
+https://okmij.org/ftp/tagless-final/course/optimizations.html#circuit-tut
+
