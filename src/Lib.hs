@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
 {-# language MultiParamTypeClasses#-}
@@ -16,22 +17,28 @@ import Language.Haskell.TH (Q, runQ, runIO, TExp(..), unType)
 import Language.Haskell.TH.Ppr (pprint)
 import Language.Haskell.TH.Syntax (Quasi(..), Lift(..))
 
-{-
--- A Haskell value of the type Sym repr => repr a
+-- | A Haskell value of the type Sym repr => repr a
 -- represents an expression in the object language of the type a
--}
 class Sym repr where
-    intS :: Int -> repr Int
+    -- intS :: Int -> repr Int
+    constS :: Lift a => a -> repr a
     addS :: repr (Int -> Int -> Int)
     mulS :: repr (Int -> Int -> Int)
+    -- | Function application 
     appS :: repr (a -> b) -> repr a -> repr b
+    -- | Function abstraction
     lamS :: (repr a -> repr b) -> repr (a -> b)
 
+
 -- | Pure evaluator
+--
+-- λ> runR exS1
+-- 3
 newtype R a = R { runR :: a }
 
 instance Sym R where
-    intS = R
+    -- intS = R
+    constS = R
     addS = R (+)
     mulS = R (*)
     R f `appS` R x = R $ f x
@@ -41,13 +48,13 @@ instance Sym R where
 newtype Code a = Code { getCode :: Q (TExp a) }
 
 instance Sym Code where
-  intS = Code . liftTyped
+  constS = Code . liftTyped
   addS = Code [|| (+) ||]
   mulS = Code [|| (*) ||]
   appS (Code f) (Code x) = Code [|| $$(f) $$(x) ||]
   lamS f = Code [|| \x -> $$( (getCode . f . Code) [||  x ||] ) ||]
 
--- | pretty-print the source code
+-- | Code generating evaluator : pretty-print the generated source code
 --
 -- > pprCode exS1
 -- (GHC.Num.+) 1 2
@@ -59,9 +66,13 @@ pprCode c = do
 
 -- an example expression
 exS1 :: Sym repr => repr Int
-exS1 = (addS `appS` intS 1) `appS` intS 2
+exS1 = (addS `appS` constS 1) `appS` constS 2
 
 
+
+-- -- combinators
+
+liftS2 f x y = (f `appS` x) `appS` y
 
 
 
