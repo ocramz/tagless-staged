@@ -34,7 +34,7 @@ instance Sym R where
     intS = R
     addS = R (+)
     mulS = R (*)
-    R x `appS` R y = R $ x y
+    R f `appS` R x = R $ f x
     lamS f = R $ runR . f . R
 
 -- | Code generating evaluator
