@@ -70,11 +70,6 @@ exS1 = (addS `appS` constS 1) `appS` constS 2
 
 
 
--- -- combinators
-
-liftS2 f x y = (f `appS` x) `appS` y
-
-
 
 -- -- combinators from the paper, using Compose instead of defining J
 
