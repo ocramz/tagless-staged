@@ -12,11 +12,11 @@ module Lib where
 
 import Data.Functor.Compose (Compose(..)) -- called J in the paper
 
-import Language.Haskell.TH (Q, runQ, runIO)
-import Language.Haskell.TH.Syntax (Quasi(..))
+import Language.Haskell.TH (Q, runQ, runIO, TExp(..))
+import Language.Haskell.TH.Syntax (Quasi(..), Lift(..))
 
 {-
--- A Haskell value of the type SSym repr => repr a 
+-- A Haskell value of the type Sym repr => repr a 
 -- represents an expression in the object language of the type a
 
 -- There is no lam form; See the class LamPure below
@@ -26,7 +26,7 @@ class Sym repr where
     intS :: Int -> repr Int
     addS :: repr (Int -> Int -> Int)
     mulS :: repr (Int -> Int -> Int)
-    appS :: repr (a -> b) -> (repr a -> repr b)
+    appS :: repr (a -> b) -> repr a -> repr b
     lamS :: (repr a -> repr b) -> repr (a -> b)
 
 -- | Pure evaluator
@@ -38,6 +38,19 @@ instance Sym R where
     mulS = R (*)
     R x `appS` R y = R $ x y
     lamS f = R $ runR . f . R
+
+newtype Code a = Code { getCode :: Q (TExp a) }
+
+instance Sym Code where
+  intS = Code . liftTyped
+  addS = Code [|| (+) ||]
+  mulS = Code [|| (*) ||]
+  appS (Code f) (Code x) = Code [|| $$(f) $$(x) ||]
+  lamS f = Code [|| \x -> $$( (lowerCode f) [||  x ||] ) ||]
+
+lowerCode :: (Code a1 -> Code a2) -> Q (TExp a1) -> Q (TExp a2)
+lowerCode f = getCode . f . Code
+
 
 {-
 type VarCounter = Int		-- we will see the need for it shortly, lamS
@@ -83,15 +96,15 @@ x *: y = pure mulS $$ x $$ y
 
 type (.:) = Compose
 
-lift :: (Functor f, Applicative g) => f a -> (f .: g) a
-lift = Compose . fmap pure
+liftJ :: (Functor f, Applicative g) => f a -> (f .: g) a
+liftJ = Compose . fmap pure
 
 mapJ2 :: Functor f =>
          (g1 a1 -> g2 a2) -> Compose f g1 a1 -> Compose f g2 a2
 mapJ2 f = Compose . fmap f . getCompose
 
 liftJ2 :: (Functor f, Functor g, Applicative h) => (f .: g) a -> (f .: (g .: h)) a
-liftJ2 = mapJ2 lift
+liftJ2 = mapJ2 liftJ
 
 
 -- `Injecting' a monad into an Applicative stack
@@ -111,14 +124,14 @@ instance (Applicative i, Monad m, Applicative m, Above m n) => Above m (Compose 
     m `bindA` f = Compose $ m `bindA` (getCompose . f)
 
 
--- lam :: (Applicative m, AppLiftable i, SSym repr, LamPure repr) =>
---        (forall j. AppLiftable j => 
---         (i :. j) (repr a) -> (m :. (i :. j)) (repr b))
---        -> (m :. i) (repr (a->b))
-lam f = fmap lamS (Compose . fmap getCompose . getCompose $ f  (Compose . pure $ v))
- where
- -- instantiate applicative j to be a Reader: repr a -> w
- v = \repra -> repra                    -- bound variable
+-- -- lam :: (Applicative m, AppLiftable i, SSym repr, LamPure repr) =>
+-- --        (forall j. AppLiftable j => 
+-- --         (i :. j) (repr a) -> (m :. (i :. j)) (repr b))
+-- --        -> (m :. i) (repr (a->b))
+-- lam f = fmap lamS (Compose . fmap getCompose . getCompose $ f  (Compose . pure $ v))
+--  where
+--  -- instantiate applicative j to be a Reader: repr a -> w
+--  v = \repra -> repra                    -- bound variable
 
 -- Make a variable an expression
 -- var :: Applicative m => i (repr a) -> (m :. i) (repr a)
