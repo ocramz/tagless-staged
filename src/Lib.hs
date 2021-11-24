@@ -37,6 +37,7 @@ instance Sym R where
     R x `appS` R y = R $ x y
     lamS f = R $ runR . f . R
 
+-- | Code generating evaluator
 newtype Code a = Code { getCode :: Q (TExp a) }
 
 instance Sym Code where
