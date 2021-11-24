@@ -12,15 +12,13 @@ module Lib where
 
 import Data.Functor.Compose (Compose(..)) -- called J in the paper
 
-import Language.Haskell.TH (Q, runQ, runIO, TExp(..))
+import Language.Haskell.TH (Q, runQ, runIO, TExp(..), unType)
+import Language.Haskell.TH.Ppr (pprint)
 import Language.Haskell.TH.Syntax (Quasi(..), Lift(..))
 
 {-
--- A Haskell value of the type Sym repr => repr a 
+-- A Haskell value of the type Sym repr => repr a
 -- represents an expression in the object language of the type a
-
--- There is no lam form; See the class LamPure below
--- dedicated to abstractions.
 -}
 class Sym repr where
     intS :: Int -> repr Int
@@ -46,37 +44,27 @@ instance Sym Code where
   addS = Code [|| (+) ||]
   mulS = Code [|| (*) ||]
   appS (Code f) (Code x) = Code [|| $$(f) $$(x) ||]
-  lamS f = Code [|| \x -> $$( (lowerCode f) [||  x ||] ) ||]
+  lamS f = Code [|| \x -> $$( (getCode . f . Code) [||  x ||] ) ||]
 
-lowerCode :: (Code a1 -> Code a2) -> Q (TExp a1) -> Q (TExp a2)
-lowerCode f = getCode . f . Code
+-- | pretty-print the source code
+--
+-- > pprCode exS1
+-- (GHC.Num.+) 1 2
+pprCode :: Code a -> IO ()
+pprCode c = do
+  q <- unType <$> runQ (getCode c)
+  putStrLn $ pprint q
 
-
-{-
-type VarCounter = Int		-- we will see the need for it shortly, lamS
-
-			-- the pure code value, the analogue
-			-- of <1> or <fun x -> x> in MetaOCaml
-newtype C a = C { unC :: VarCounter -> Exp }
-
-instance SSym C where
-    intS = C . const . LitE . IntegerL . fromIntegral
-    addS = C $ const $ VarE $ '(Prelude.+)
-    mulS = C $ const $ VarE $ '(Prelude.*)
-    C x `appS` C y = C $ \vc -> AppE (x vc) (y vc)
-
-runCS :: C a -> String
-runCS m = pprint $ unC m 0
-
-
-exS1c = runCS exS1 
--}
 
 -- an example expression
 exS1 :: Sym repr => repr Int
 exS1 = (addS `appS` intS 1) `appS` intS 2
 
 
+
+
+
+-- -- combinators from the paper, using Compose instead of defining J
 
 infixl 2 $$
 ($$) :: (Sym repr, Applicative m) => 
