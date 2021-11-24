@@ -1,2 +1,5 @@
 # tagless-staged
-Notes from "Combinators for Impure yet Hygienic Code Generation" 
+
+[![Build Status](https://travis-ci.org/ocramz/tagless-staged.png)](https://travis-ci.org/ocramz/tagless-staged)
+
+TODO Description.
