@@ -27,18 +27,9 @@ class Sym repr where
     addS :: repr (Int -> Int -> Int)
     mulS :: repr (Int -> Int -> Int)
     appS :: repr (a -> b) -> (repr a -> repr b)
+    lamS :: (repr a -> repr b) -> repr (a -> b)
 
--- ------------------------------------------------------------------------
--- Adding `purely generated' lambda-expressions to our EDSL
--- Any effect of generating their body can't propagate past
--- the binder.
-class LamPure repr where
-    lamS :: (repr a -> repr b) -> repr (a->b)
-
-{-
--- The interpreters for our DSL
--- The evaluator
--}
+-- | Pure evaluator
 newtype R a = R { runR :: a }
 
 instance Sym R where
@@ -46,6 +37,7 @@ instance Sym R where
     addS = R (+)
     mulS = R (*)
     R x `appS` R y = R $ x y
+    lamS f = R $ runR . f . R
 
 {-
 type VarCounter = Int		-- we will see the need for it shortly, lamS
@@ -67,6 +59,7 @@ runCS m = pprint $ unC m 0
 exS1c = runCS exS1 
 -}
 
+-- an example expression
 exS1 :: Sym repr => repr Int
 exS1 = (addS `appS` intS 1) `appS` intS 2
 
